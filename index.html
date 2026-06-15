@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>语文笔记生成器 · AI智能版</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/markmap-toolbar@0.17.2/dist/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markmap-view@0.17.2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -257,6 +260,45 @@
         .result-card {
             display: none;
         }
+        .tab-bar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            background: #F1F5F9;
+            padding: 4px;
+            border-radius: 10px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            background: transparent;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: #fff;
+            color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .tab-btn:hover:not(.active) {
+            color: var(--text);
+        }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+        .mindmap-container {
+            width: 100%;
+            height: 500px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            background: #fff;
+        }
+        .mindmap-container svg { width: 100%; height: 100%; }
         .result-header {
             display: flex;
             justify-content: space-between;
@@ -408,7 +450,19 @@
                     <button class="btn btn-success" onclick="copyNote()">📋 复制</button>
                 </div>
             </div>
-            <div id="noteContent" class="note-content"></div>
+
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('note')">📝 笔记</button>
+                <button class="tab-btn" onclick="switchTab('mindmap')">🧠 思维导图</button>
+            </div>
+
+            <div id="noteTab" class="tab-panel active">
+                <div id="noteContent" class="note-content"></div>
+            </div>
+
+            <div id="mindmapTab" class="tab-panel">
+                <div id="mindmap" class="mindmap-container"></div>
+            </div>
         </div>
 
         <!-- 错误 -->
@@ -528,6 +582,7 @@
         }
 
         function displayNote(note) {
+            currentMarkdown = note;
             let html = note
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
@@ -568,6 +623,74 @@
 
             document.getElementById('noteContent').innerHTML = html;
             document.getElementById('resultCard').style.display = 'block';
+        }
+
+        let currentMarkdown = '';
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', (tab === 'note' && i === 0) || (tab === 'mindmap' && i === 1));
+            });
+            document.getElementById('noteTab').classList.toggle('active', tab === 'note');
+            document.getElementById('mindmapTab').classList.toggle('active', tab === 'mindmap');
+            if (tab === 'mindmap' && currentMarkdown) renderMindmap();
+        }
+
+        function markdownToMarkmap(md) {
+            const lines = md.split('\n');
+            const root = { name: '', children: [] };
+            let currentH1 = null, currentH2 = null, currentH3 = null;
+
+            for (const line of lines) {
+                const h1 = line.match(/^# (.+)$/);
+                const h2 = line.match(/^## (.+)$/);
+                const h3 = line.match(/^### (.+)$/);
+                const bullet = line.match(/^\* (.+)$/);
+                const bold = line.match(/^\*\*(.+?)\*\*[：:](.+)$/);
+
+                if (h1) {
+                    currentH1 = { name: h1[1].replace(/[📚✨📝🎯🌊🐠🎨]/g, '').trim(), children: [] };
+                    root.children.push(currentH1);
+                    currentH2 = null; currentH3 = null;
+                } else if (h2) {
+                    currentH2 = { name: h2[1].replace(/[📚✨📝🎯💡]/g, '').trim(), children: [] };
+                    if (currentH1) currentH1.children.push(currentH2);
+                    currentH3 = null;
+                } else if (h3) {
+                    currentH3 = { name: h3[1].trim(), children: [] };
+                    if (currentH2) currentH2.children.push(currentH3);
+                } else if (bold) {
+                    const node = { name: `**${bold[1].trim()}**: ${bold[2].trim()}`, children: [] };
+                    if (currentH3) currentH3.children.push(node);
+                    else if (currentH2) currentH2.children.push(node);
+                } else if (bullet) {
+                    const node = { name: bullet[1].replace(/\*\*/g, '').trim(), children: [] };
+                    if (currentH3) currentH3.children.push(node);
+                    else if (currentH2) currentH2.children.push(node);
+                }
+            }
+
+            if (root.children.length === 0) {
+                root.children.push({ name: '笔记内容', children: [] });
+            }
+            return root;
+        }
+
+        function renderMindmap() {
+            const container = document.getElementById('mindmap');
+            container.innerHTML = '';
+            const root = markdownToMarkmap(currentMarkdown);
+            const { Markmap } = window.markmap;
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.style.width = '100%';
+            svg.style.height = '100%';
+            container.appendChild(svg);
+            Markmap.create(svg, {
+                colorFreezeLevel: 2,
+                duration: 300,
+                maxWidth: 200,
+                initialExpandLevel: 2,
+            }, root);
         }
 
         function copyNote() {
