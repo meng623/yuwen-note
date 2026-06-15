@@ -294,9 +294,10 @@
             border: 1px solid var(--border);
             border-radius: 12px;
             overflow: hidden;
-            background: #fff;
+            background: linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 100%);
         }
         .mindmap-container svg { width: 100%; height: 100%; }
+        .mindmap-container .link { transition: stroke-opacity 0.3s; }
         .result-header {
             display: flex;
             justify-content: space-between;
@@ -702,73 +703,116 @@
 
             const width = container.clientWidth || 800;
             const height = container.clientHeight || 500;
-            const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'];
+            const palette = [
+                { bg: '#4F46E5', text: '#fff' },
+                { bg: '#EEF2FF', text: '#3730A3' },
+                { bg: '#FEF3C7', text: '#92400E' },
+                { bg: '#D1FAE5', text: '#065F46' },
+                { bg: '#FCE7F3', text: '#9D174D' },
+                { bg: '#DBEAFE', text: '#1E40AF' },
+                { bg: '#F3E8FF', text: '#6B21A8' },
+            ];
 
             const svg = d3.select(container).append('svg')
-                .attr('width', width).attr('height', height);
-            const g = svg.append('g').attr('transform', 'translate(80, 0)');
+                .attr('width', width).attr('height', height)
+                .attr('viewBox', `0 0 ${width} ${height}`);
+            svg.append('defs').append('filter').attr('id', 'shadow')
+                .append('feDropShadow').attr('dx', 0).attr('dy', 2).attr('stdDeviation', 3).attr('flood-opacity', 0.1);
+            const g = svg.append('g').attr('transform', 'translate(100, 20)');
 
-            const treeLayout = d3.tree().size([height - 40, width - 280]);
+            const treeLayout = d3.tree().size([height - 40, width - 320]).nodeSize([36, 0]);
             const root = d3.hierarchy(data);
-            root.x0 = height / 2;
+            root.x0 = 0;
             root.y0 = 0;
 
+            let i = 0;
             function update(source) {
                 const treeData = treeLayout(root);
                 const nodes = treeData.descendants();
                 const links = treeData.links();
+                nodes.forEach(d => { d.y = d.depth * 220; });
 
-                nodes.forEach(d => { d.y = d.depth * 200; });
-
-                const node = g.selectAll('g.node').data(nodes, d => d.id || (d.id = Math.random()));
+                const node = g.selectAll('g.node').data(nodes, d => d.id || (d.id = ++i));
 
                 const nodeEnter = node.enter().append('g')
                     .attr('class', 'node')
                     .attr('transform', `translate(${source.y0},${source.x0})`)
-                    .on('click', (event, d) => { if (d.children) { d._children = d.children; d.children = null; } else { d.children = d._children; d._children = null; } update(d); });
+                    .style('cursor', 'pointer')
+                    .on('click', (event, d) => {
+                        if (d.children) { d._children = d.children; d.children = null; }
+                        else { d.children = d._children; d._children = null; }
+                        update(d);
+                    });
 
-                nodeEnter.append('circle').attr('r', 1e-6)
-                    .style('fill', d => d._children ? '#fff' : (colors[d.depth % colors.length]))
-                    .style('stroke', d => colors[d.depth % colors.length])
-                    .style('stroke-width', '2px')
-                    .style('cursor', 'pointer');
+                nodeEnter.append('rect').attr('rx', 10).attr('ry', 10)
+                    .attr('width', 1e-6).attr('height', 1e-6)
+                    .attr('x', 0).attr('y', -14)
+                    .style('fill', d => palette[d.depth % palette.length].bg)
+                    .style('stroke', d => d.depth === 0 ? '#4F46E5' : 'none')
+                    .style('stroke-width', d => d.depth === 0 ? '2px' : '0')
+                    .style('filter', 'url(#shadow)');
 
                 nodeEnter.append('text')
-                    .attr('dy', '.35em')
-                    .attr('x', d => d.children || d._children ? -14 : 14)
-                    .attr('text-anchor', d => d.children || d._children ? 'end' : 'start')
-                    .text(d => d.data.name.length > 16 ? d.data.name.slice(0, 16) + '…' : d.data.name)
-                    .style('font-size', d => d.depth === 0 ? '14px' : '12px')
-                    .style('font-weight', d => d.depth === 0 ? '700' : '400')
-                    .style('fill', '#1E293B');
+                    .attr('dy', '0.35em')
+                    .attr('x', 12)
+                    .attr('text-anchor', 'start')
+                    .text(d => {
+                        const maxLen = d.depth === 0 ? 20 : d.depth === 1 ? 16 : 12;
+                        const name = d.data.name.replace(/[📚✨📝🎯🌊🐠🎨💡📖🧱]/g, '').trim();
+                        return name.length > maxLen ? name.slice(0, maxLen) + '…' : name;
+                    })
+                    .style('font-size', d => d.depth === 0 ? '15px' : d.depth === 1 ? '13px' : '12px')
+                    .style('font-weight', d => d.depth <= 1 ? '600' : '400')
+                    .style('fill', d => palette[d.depth % palette.length].text)
+                    .style('pointer-events', 'none');
+
+                nodeEnter.append('text')
+                    .attr('class', 'expand-icon')
+                    .attr('dy', '0.35em').attr('x', 12).attr('text-anchor', 'start')
+                    .style('font-size', '10px').style('fill', '#94A3B8')
+                    .text(d => d._children ? ' [+]' : '');
 
                 const nodeUpdate = nodeEnter.merge(node);
-                nodeUpdate.transition().duration(300)
+                nodeUpdate.transition().duration(400).ease(d3.easeCubicOut)
                     .attr('transform', d => `translate(${d.y},${d.x})`);
-                nodeUpdate.select('circle')
-                    .attr('r', 6)
-                    .style('fill', d => d._children ? '#fff' : (colors[d.depth % colors.length]))
-                    .style('stroke', d => colors[d.depth % colors.length]);
+                nodeUpdate.select('rect').transition().duration(400)
+                    .attr('width', d => {
+                        const text = d.data.name.replace(/[📚✨📝🎯🌊🐠🎨💡📖🧱]/g, '').trim();
+                        return Math.min(text.length * 14 + 24, 200);
+                    }).attr('height', 28)
+                    .style('fill', d => palette[d.depth % palette.length].bg);
 
-                const nodeExit = node.exit().transition().duration(300)
+                const nodeExit = node.exit().transition().duration(400)
                     .attr('transform', `translate(${source.y},${source.x})`).remove();
-                nodeExit.select('circle').attr('r', 1e-6);
+                nodeExit.select('rect').attr('width', 0).attr('height', 0);
                 nodeExit.select('text').style('fill-opacity', 1e-6);
 
                 const link = g.selectAll('path.link').data(links, d => d.target.id);
                 const linkEnter = link.enter().insert('path', 'g')
                     .attr('class', 'link')
-                    .attr('d', () => { const o = { x: source.x0, y: source.y0 }; return diagonal(o, o); })
-                    .style('fill', 'none').style('stroke', '#CBD5E1').style('stroke-width', '1.5px');
-                linkEnter.merge(link).transition().duration(300).attr('d', d => diagonal(d.source, d.target));
-                link.exit().transition().duration(300).attr('d', () => { const o = { x: source.x, y: source.y }; return diagonal(o, o); }).remove();
+                    .attr('d', () => { const o = { x: source.x0, y: source.y0 }; return elbow(o, o); })
+                    .style('fill', 'none')
+                    .style('stroke', d => palette[d.source.depth % palette.length].bg)
+                    .style('stroke-width', '2px')
+                    .style('stroke-opacity', 0.5);
+                linkEnter.merge(link).transition().duration(400).attr('d', d => elbow(d.source, d.target));
+                link.exit().transition().duration(400).attr('d', () => { const o = { x: source.x, y: source.y }; return elbow(o, o); }).remove();
 
                 nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
             }
 
-            function diagonal(s, d) { return `M ${s.y} ${s.x} C ${(s.y + d.y) / 2} ${s.x}, ${(s.y + d.y) / 2} ${d.x}, ${d.y} ${d.x}`; }
+            function elbow(s, d) {
+                return `M ${s.y} ${s.x} C ${(s.y + d.y) / 2} ${s.x}, ${(s.y + d.y) / 2} ${d.x}, ${d.y} ${d.x}`;
+            }
 
             update(root);
+
+            // 居中显示
+            setTimeout(() => {
+                const bbox = svg.node().getBBox();
+                const scale = Math.min(width / (bbox.width + 160), height / (bbox.height + 40), 1);
+                svg.attr('viewBox', `${bbox.x - 40} ${bbox.y - 20} ${bbox.width + 80} ${bbox.height + 40}`);
+            }, 500);
         }
 
         function copyNote() {
