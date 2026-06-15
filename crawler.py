@@ -7,7 +7,7 @@ import re
 from bs4 import BeautifulSoup
 
 # 从环境变量读取 API Key
-SENSENOVA_API_KEY = os.environ.get("sk-HmObAvrVO5dLSdNpSkCKaHtwEz1yT81Y", "")
+SENSENOVA_API_KEY = os.environ.get("API_KEY", "")
 
 def crawl_hanchacha(lesson_name):
     """从 hanchacha.com 爬取所有相关资料"""
