@@ -354,7 +354,7 @@
             }
         }
         
-        async function pollForNewResult(lessonName, maxAttempts = 60, interval = 5000) {
+        async function pollForNewResult(lessonName, maxAttempts = 120, interval = 5000) {
             // 记录开始时间，用于强制获取最新版本
             const startTime = getTimestamp();
             
