@@ -516,7 +516,10 @@
                     const resp = await fetch(url, { headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' } });
                     if (resp.ok) {
                         const data = await resp.json();
-                        const note = atob(data.content.replace(/\n/g, ''));
+                        const binary = atob(data.content.replace(/\n/g, ''));
+                        const bytes = new Uint8Array(binary.length);
+                        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                        const note = new TextDecoder('utf-8').decode(bytes);
                         if (note && note.length > 800 && !note.includes('正在努力生成中')) return note;
                     }
                 } catch {}
