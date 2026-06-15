@@ -636,35 +636,56 @@
 
         function markdownToMarkmap(md) {
             const lines = md.split('\n');
-            const root = { name: '', children: [] };
-            let currentH1 = null, currentH2 = null, currentH3 = null;
+            const root = { name: '笔记', children: [] };
+            let h1 = null, h2 = null, h3 = null;
+
+            function clean(s) {
+                return s.replace(/[📚✨📝🎯🌊🐠🎨💡📖🧱]/g, '').replace(/\*\*/g, '').trim();
+            }
 
             for (const line of lines) {
-                const h1 = line.match(/^# (.+)$/);
-                const h2 = line.match(/^## (.+)$/);
-                const h3 = line.match(/^### (.+)$/);
-                const bullet = line.match(/^\* (.+)$/);
-                const bold = line.match(/^\*\*(.+?)\*\*[：:](.+)$/);
+                const t = line.trim();
+                if (!t) continue;
 
-                if (h1) {
-                    currentH1 = { name: h1[1].replace(/[📚✨📝🎯🌊🐠🎨]/g, '').trim(), children: [] };
-                    root.children.push(currentH1);
-                    currentH2 = null; currentH3 = null;
-                } else if (h2) {
-                    currentH2 = { name: h2[1].replace(/[📚✨📝🎯💡]/g, '').trim(), children: [] };
-                    if (currentH1) currentH1.children.push(currentH2);
-                    currentH3 = null;
-                } else if (h3) {
-                    currentH3 = { name: h3[1].trim(), children: [] };
-                    if (currentH2) currentH2.children.push(currentH3);
-                } else if (bold) {
-                    const node = { name: `**${bold[1].trim()}**: ${bold[2].trim()}`, children: [] };
-                    if (currentH3) currentH3.children.push(node);
-                    else if (currentH2) currentH2.children.push(node);
-                } else if (bullet) {
-                    const node = { name: bullet[1].replace(/\*\*/g, '').trim(), children: [] };
-                    if (currentH3) currentH3.children.push(node);
-                    else if (currentH2) currentH2.children.push(node);
+                if (t.match(/^# [^#]/)) {
+                    const name = clean(t.replace(/^# /, ''));
+                    h1 = { name, children: [] };
+                    root.children.push(h1);
+                    h2 = null; h3 = null;
+                } else if (t.match(/^## /)) {
+                    const name = clean(t.replace(/^## /, ''));
+                    h2 = { name, children: [] };
+                    if (h1) h1.children.push(h2);
+                    else root.children.push(h2);
+                    h3 = null;
+                } else if (t.match(/^### /)) {
+                    const name = clean(t.replace(/^### /, ''));
+                    h3 = { name, children: [] };
+                    if (h2) h2.children.push(h3);
+                    else if (h1) h1.children.push(h3);
+                } else if (t.match(/^\* /)) {
+                    const name = clean(t.replace(/^\* /, ''));
+                    if (name) {
+                        const node = { name, children: [] };
+                        if (h3) h3.children.push(node);
+                        else if (h2) h2.children.push(node);
+                        else if (h1) h1.children.push(node);
+                    }
+                } else if (t.startsWith('|')) {
+                    // 跳过表格分隔行
+                    if (t.match(/^\|[\s-|]+\|$/)) continue;
+                    // 表格行作为子节点
+                    const cells = t.split('|').map(c => c.trim()).filter(Boolean);
+                    if (cells.length > 0 && h2) {
+                        h2.children.push({ name: cells.join(' | '), children: [] });
+                    }
+                } else if (!t.startsWith('>') && !t.startsWith('---') && t.length < 80) {
+                    // 其他短文本作为子节点
+                    const name = clean(t);
+                    if (name && name.length > 2) {
+                        const parent = h3 || h2 || h1;
+                        if (parent) parent.children.push({ name, children: [] });
+                    }
                 }
             }
 
