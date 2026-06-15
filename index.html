@@ -355,40 +355,33 @@
         }
         
         async function pollForNewResult(lessonName, maxAttempts = 120, interval = 5000) {
-            // 记录开始时间，用于强制获取最新版本
-            const startTime = getTimestamp();
-            
+            const token = localStorage.getItem('github_token');
             for (let i = 0; i < maxAttempts; i++) {
                 await new Promise(r => setTimeout(r, interval));
-                document.getElementById('progressInfo').innerHTML = `⏱️ 等待中... (${i+1}/${maxAttempts}) AI 正在生成详细笔记`;
+                document.getElementById('progressInfo').innerHTML = `鈴憋笍 绛夊緟涓?.. (${i+1}/${maxAttempts}) AI 姝ｅ湪鐢熸垚璇︾粏绗旇`;
                 
                 try {
-                    // 添加时间戳参数强制刷新，避免 GitHub 缓存
-                    const url = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/${encodeURIComponent(lessonName)}.md?t=${getTimestamp()}`;
+                    const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/data/${encodeURIComponent(lessonName)}.md`;
                     const response = await fetch(url, {
-                        cache: 'no-cache',
                         headers: {
-                            'Cache-Control': 'no-cache, no-store, must-revalidate',
-                            'Pragma': 'no-cache'
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
                         }
                     });
                     
                     if (response.ok) {
-                        const note = await response.text();
-                        // 检查是否是 AI 生成的完整笔记（长度足够，不是备用模板）
-                        if (note && note.length > 800 && !note.includes('AI 服务暂时不可用')) {
-                            console.log(`✅ 获取到新笔记，长度: ${note.length} 字`);
+                        const data = await response.json();
+                        const note = atob(data.content.replace(/\n/g, ''));
+                        if (note && note.length > 800 && !note.includes('AI 鏈嶅姟鏆傛椂涓嶅彲鐢?) && !note.includes('姝ｅ湪鍔姏鐢熸垚涓?)) {
+                            console.log(`鉁?鑾峰彇鍒版柊绗旇锛岄暱搴? ${note.length} 瀛梎);
                             return note;
                         }
                     }
                 } catch(e) {
-                    // 文件还不存在，继续等待
                 }
             }
             return null;
-        }
-        
-        function displayNote(note) {
+        }function displayNote(note) {
             // 简单 Markdown 转 HTML
             let html = note
                 .replace(/&/g, '&amp;')
