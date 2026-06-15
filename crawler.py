@@ -165,7 +165,7 @@ def generate_with_ai(lesson_name, raw_materials):
                 "Content-Type": "application/json"
             },
             json={
-                "model": "deepseek-v4-flash",
+                "model": "sensenova-6.7-flash-lite",
                 "messages": [
                     {"role": "system", "content": "你是小学语文特级教师，擅长写超详细、超专业的课文笔记。"},
                     {"role": "user", "content": prompt}
