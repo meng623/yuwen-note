@@ -7,7 +7,7 @@ import re
 from bs4 import BeautifulSoup
 
 # 从环境变量读取 API Key
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+SENSENOVA_API_KEY = os.environ.get("sk-HmObAvrVO5dLSdNpSkCKaHtwEz1yT81Y", "")
 
 def crawl_hanchacha(lesson_name):
     """从 hanchacha.com 爬取所有相关资料"""
@@ -56,13 +56,13 @@ def crawl_hanchacha(lesson_name):
 def generate_with_ai(lesson_name, raw_materials):
     """使用 AI 生成详细的学霸笔记"""
     
-    print(f"  🤖 AI 状态: {'已启用' if DEEPSEEK_API_KEY else '未配置'}")
+    print(f"  🤖 AI 状态: {'已启用' if SENSENOVA_API_KEY else '未配置'}")
     
-    if not DEEPSEEK_API_KEY:
+    if not SENSENOVA_API_KEY:
         return generate_fallback_note(lesson_name, raw_materials)
     
     try:
-        print("  🤖 正在调用 DeepSeek API...")
+        print("  🤖 正在调用 SenseNova API...")
         
         prompt = f"""你是小学语文特级教师。请为课文《{lesson_name}》生成一份超级详细的学霸笔记。
 
@@ -159,13 +159,13 @@ def generate_with_ai(lesson_name, raw_materials):
 请直接输出笔记，不要输出解释。"""
 
         response = requests.post(
-            "https://api.deepseek.com/v1/chat/completions",
+            "https://token.sensenova.cn/v1/chat/completions",
             headers={
-                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                "Authorization": f"Bearer {SENSENOVA_API_KEY}",
                 "Content-Type": "application/json"
             },
             json={
-                "model": "deepseek-chat",
+                "model": "deepseek-v4-flash",
                 "messages": [
                     {"role": "system", "content": "你是小学语文特级教师，擅长写超详细、超专业的课文笔记。"},
                     {"role": "user", "content": prompt}
@@ -222,7 +222,7 @@ def main():
     lesson_name = sys.argv[1]
     print("=" * 50)
     print(f"🕷️ 正在为《{lesson_name}》生成笔记...")
-    print(f"🤖 DeepSeek API: {'已配置' if DEEPSEEK_API_KEY else '未配置'}")
+    print(f"🤖 SenseNova API: {'已配置' if SENSENOVA_API_KEY else '未配置'}")
     print("=" * 50)
     
     print("\n⭐ 爬取 hanchacha.com...")
