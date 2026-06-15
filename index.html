@@ -290,7 +290,7 @@
         .tab-panel.active { display: block; }
         .mindmap-container {
             width: 100%;
-            height: 500px;
+            height: 650px;
             border: 1px solid var(--border);
             border-radius: 12px;
             overflow: hidden;
@@ -727,14 +727,15 @@
             const root = d3.hierarchy(data);
             const countLeaves = d => d.children ? d.children.reduce((s, c) => s + countLeaves(c), 0) : 1;
             const totalLeaves = countLeaves(root);
-            const radius = Math.min(width, height) * 0.38;
+            const maxDepth = 2; // 只显示2层，避免过于密集
+            const radius = Math.min(width, height) * 0.36;
 
             // 径向布局：按叶子数分配角度
             function radialLayout(node, startAngle, endAngle, depth) {
                 node.angle = (startAngle + endAngle) / 2;
-                node.radius = depth * (radius / Math.max(root.height, 2));
+                node.radius = depth * (radius / maxDepth);
                 node.depth = depth;
-                if (node.children) {
+                if (node.children && depth < maxDepth) {
                     let childStart = startAngle;
                     const totalChildLeaves = node.children.reduce((s, c) => s + countLeaves(c), 0);
                     node.children.forEach(child => {
@@ -788,17 +789,34 @@
                 });
 
                 nodeEnter.append('text')
+                    .attr('class', 'node-text')
                     .attr('dy', '0.35em')
                     .attr('text-anchor', 'middle')
                     .text(d => {
-                        const maxLen = d.depth === 0 ? 12 : d.depth === 1 ? 10 : 8;
+                        const maxLen = d.depth === 0 ? 14 : d.depth === 1 ? 12 : 10;
                         const name = d.data.name.replace(/[📚✨📝🎯🌊🐠🎨💡📖🧱]/g, '').trim();
                         return name.length > maxLen ? name.slice(0, maxLen) + '…' : name;
                     })
-                    .style('font-size', d => d.depth === 0 ? '14px' : d.depth === 1 ? '12px' : '11px')
+                    .style('font-size', d => d.depth === 0 ? '15px' : d.depth === 1 ? '13px' : '12px')
                     .style('font-weight', d => d.depth <= 1 ? '700' : '500')
                     .style('fill', '#fff')
                     .style('pointer-events', 'none');
+
+                // 有子节点时显示展开提示
+                nodeEnter.append('text')
+                    .attr('class', 'expand-hint')
+                    .attr('dy', '1.8em')
+                    .attr('text-anchor', 'middle')
+                    .style('font-size', '10px')
+                    .style('fill', 'rgba(255,255,255,0.7)')
+                    .style('pointer-events', 'none')
+                    .text(d => {
+                        if (d.depth >= maxDepth) return '';
+                        const count = (d.children || d._children || []).length;
+                        if (d._children) return `▼ ${count}`;
+                        if (d.children && count > 0) return `▼ ${count}`;
+                        return '';
+                    });
 
                 const nodeUpdate = nodeEnter.merge(node);
                 nodeUpdate.transition().duration(500).ease(d3.easeCubicOut)
@@ -808,15 +826,25 @@
                     const el = d3.select(this);
                     if (d.depth === 0) {
                         el.select('circle').transition().duration(500)
-                            .attr('r', 36)
+                            .attr('r', 40)
                             .style('fill', palette[0].bg);
                     } else {
                         const name = d.data.name.replace(/[📚✨📝🎯🌊🐠🎨💡📖🧱]/g, '').trim();
+                        const w = Math.max(name.length * 14 + 24, 70);
                         el.select('rect').transition().duration(500)
-                            .attr('width', Math.max(name.length * 13 + 20, 60)).attr('height', 26)
-                            .attr('x', -Math.max(name.length * 13 + 20, 60) / 2).attr('y', -13)
+                            .attr('width', w).attr('height', 30)
+                            .attr('x', -w / 2).attr('y', -15)
                             .style('fill', palette[d.depth % palette.length].bg);
                     }
+                    // 更新展开提示
+                    el.select('.expand-hint')
+                        .text(() => {
+                            if (d.depth >= maxDepth) return '';
+                            const count = (d.children || d._children || []).length;
+                            if (d._children) return `▸ 展开(${count})`;
+                            if (d.children && count > 0) return `▾ 收起`;
+                            return '';
+                        });
                 });
 
                 node.exit().transition().duration(400)
