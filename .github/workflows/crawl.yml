@@ -30,7 +30,7 @@ jobs:
       - name: 运行爬虫
         env:
           LESSON_NAME: ${{ github.event.inputs.lesson_name }}
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          API_KEY: ${{ secrets.API_KEY }}
         run: |
           python crawler.py "$LESSON_NAME"
       
