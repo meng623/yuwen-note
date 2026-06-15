@@ -65,13 +65,31 @@ def _safe_get(session: requests.Session, url: str) -> Optional[str]:
         return None
 
 
-def crawl_hanchacha(lesson_name: str) -> str:
+def _extract_content(soup: BeautifulSoup) -> Optional[str]:
+    """通用内容提取：尝试多种常见的文章容器"""
+    for selector in [
+        ("article", None),
+        ("div", {"class_": "entry-content"}),
+        ("div", {"class_": "article-content"}),
+        ("div", {"class_": "post-content"}),
+        ("div", {"class_": "content"}),
+        ("div", {"class_": "main"}),
+    ]:
+        tag, attrs = selector[0], selector[1] if len(selector) > 1 else None
+        el = soup.find(tag, **(attrs or {}))
+        if el:
+            text = el.get_text(strip=True)
+            text = re.sub(r"\s+", " ", text)
+            if len(text) > 50:
+                return text[:1500]
+    return None
+
+
+def crawl_hanchacha(lesson_name: str, session: requests.Session) -> str:
     """从 hanchacha.com 爬取所有相关资料"""
     log.info("正在从 hanchacha.com 搜索《%s》...", lesson_name)
 
-    session = _build_session()
     all_parts: list[str] = []
-
     search_url = f"https://hanchacha.com/?s={lesson_name}"
     html = _safe_get(session, search_url)
     if not html:
@@ -87,26 +105,115 @@ def crawl_hanchacha(lesson_name: str) -> str:
             if href not in found_urls:
                 found_urls.append(href)
 
-    log.info("找到 %d 个相关页面", len(found_urls))
+    log.info("  hanchacha: 找到 %d 个相关页面", len(found_urls))
 
     for url in found_urls[:MAX_PAGES]:
         time.sleep(CRAWL_DELAY)
         page_html = _safe_get(session, url)
         if not page_html:
             continue
-
         page_soup = BeautifulSoup(page_html, "html.parser")
-        content_div = (
-            page_soup.find("article")
-            or page_soup.find("div", class_="entry-content")
-        )
-        if content_div:
-            text = content_div.get_text(strip=True)
-            text = re.sub(r"\s+", " ", text)
-            all_parts.append(text[:1500])
+        content = _extract_content(page_soup)
+        if content:
+            all_parts.append(content)
 
-    result = "\n\n---\n".join(all_parts)
-    return result[:MAX_TEXT_LEN]
+    return "\n\n---\n".join(all_parts)
+
+
+def crawl_ruiwen(lesson_name: str, session: requests.Session) -> str:
+    """从 ruiwen.com 爬取教学资源"""
+    log.info("正在从 ruiwen.com 搜索《%s》...", lesson_name)
+
+    all_parts: list[str] = []
+    search_url = f"https://www.ruiwen.com/search/?q={lesson_name}"
+    html = _safe_get(session, search_url)
+    if not html:
+        return ""
+
+    soup = BeautifulSoup(html, "html.parser")
+    found_urls: list[str] = []
+
+    for link in soup.find_all("a", href=True):
+        href = link["href"]
+        text = link.get_text().lower()
+        full_url = urljoin("https://www.ruiwen.com", href)
+        if lesson_name.lower() in text and "ruiwen.com" in full_url:
+            if full_url not in found_urls:
+                found_urls.append(full_url)
+
+    log.info("  ruiwen: 找到 %d 个相关页面", len(found_urls))
+
+    for url in found_urls[:MAX_PAGES]:
+        time.sleep(CRAWL_DELAY)
+        page_html = _safe_get(session, url)
+        if not page_html:
+            continue
+        page_soup = BeautifulSoup(page_html, "html.parser")
+        content = _extract_content(page_soup)
+        if content:
+            all_parts.append(content)
+
+    return "\n\n---\n".join(all_parts)
+
+
+def crawl_zxxk(lesson_name: str, session: requests.Session) -> str:
+    """从 zxxk.com 爬取学科资源"""
+    log.info("正在从 zxxk.com 搜索《%s》...", lesson_name)
+
+    all_parts: list[str] = []
+    search_url = f"https://www.zxxk.com/search/?keyword={lesson_name}&category=0&grade=0&subject=1"
+    html = _safe_get(session, search_url)
+    if not html:
+        return ""
+
+    soup = BeautifulSoup(html, "html.parser")
+    found_urls: list[str] = []
+
+    for link in soup.find_all("a", href=True):
+        href = link["href"]
+        text = link.get_text().lower()
+        full_url = urljoin("https://www.zxxk.com", href)
+        if lesson_name.lower() in text and "zxxk.com" in full_url:
+            if full_url not in found_urls:
+                found_urls.append(full_url)
+
+    log.info("  zxxk: 找到 %d 个相关页面", len(found_urls))
+
+    for url in found_urls[:MAX_PAGES]:
+        time.sleep(CRAWL_DELAY)
+        page_html = _safe_get(session, url)
+        if not page_html:
+            continue
+        page_soup = BeautifulSoup(page_html, "html.parser")
+        content = _extract_content(page_soup)
+        if content:
+            all_parts.append(content)
+
+    return "\n\n---\n".join(all_parts)
+
+
+def crawl_all(lesson_name: str) -> str:
+    """从多个网站爬取资料并合并"""
+    session = _build_session()
+
+    sources = [
+        ("hanchacha", crawl_hanchacha),
+        ("ruiwen", crawl_ruiwen),
+        ("zxxk", crawl_zxxk),
+    ]
+
+    all_results: list[str] = []
+    for name, crawl_fn in sources:
+        try:
+            result = crawl_fn(lesson_name, session)
+            if result:
+                all_results.append(f"[来源: {name}]\n{result}")
+        except Exception as e:
+            log.warning("  %s 爬取异常: %s", name, e)
+
+    combined = "\n\n===\n\n".join(all_results)
+    log.info("共爬取 %d 个来源，总长度 %d 字", len(all_results), len(combined))
+    return combined[:MAX_TEXT_LEN]
 
 
 def generate_with_ai(lesson_name: str, raw_materials: str) -> str:
@@ -279,7 +386,7 @@ def main() -> None:
     log.info("SenseNova API: %s", "已配置" if SENSENOVA_API_KEY else "未配置")
     log.info("=" * 50)
 
-    raw = crawl_hanchacha(lesson_name)
+    raw = crawl_all(lesson_name)
     note = generate_with_ai(lesson_name, raw)
 
     os.makedirs("data", exist_ok=True)
