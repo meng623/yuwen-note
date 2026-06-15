@@ -703,116 +703,153 @@
 
             const width = container.clientWidth || 800;
             const height = container.clientHeight || 500;
+            const cx = width / 2, cy = height / 2;
+
             const palette = [
-                { bg: '#4F46E5', text: '#fff' },
-                { bg: '#EEF2FF', text: '#3730A3' },
-                { bg: '#FEF3C7', text: '#92400E' },
-                { bg: '#D1FAE5', text: '#065F46' },
-                { bg: '#FCE7F3', text: '#9D174D' },
-                { bg: '#DBEAFE', text: '#1E40AF' },
-                { bg: '#F3E8FF', text: '#6B21A8' },
+                { bg: '#4F46E5', text: '#fff', line: '#818CF8' },
+                { bg: '#10B981', text: '#fff', line: '#6EE7B7' },
+                { bg: '#F59E0B', text: '#fff', line: '#FCD34D' },
+                { bg: '#EF4444', text: '#fff', line: '#FCA5A5' },
+                { bg: '#8B5CF6', text: '#fff', line: '#C4B5FD' },
+                { bg: '#EC4899', text: '#fff', line: '#F9A8D4' },
+                { bg: '#06B6D4', text: '#fff', line: '#67E8F9' },
             ];
 
             const svg = d3.select(container).append('svg')
-                .attr('width', width).attr('height', height)
-                .attr('viewBox', `0 0 ${width} ${height}`);
-            svg.append('defs').append('filter').attr('id', 'shadow')
-                .append('feDropShadow').attr('dx', 0).attr('dy', 2).attr('stdDeviation', 3).attr('flood-opacity', 0.1);
-            const g = svg.append('g').attr('transform', 'translate(100, 20)');
+                .attr('width', width).attr('height', height);
+            svg.append('defs').append('filter').attr('id', 'glow')
+                .append('feGaussianBlur').attr('stdDeviation', 4).attr('result', 'blur');
+            svg.append('defs').select('#glow').append('feMerge')
+                .html('<feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/>');
 
-            const treeLayout = d3.tree().size([height - 40, width - 320]).nodeSize([36, 0]);
+            const g = svg.append('g');
+
             const root = d3.hierarchy(data);
-            root.x0 = 0;
-            root.y0 = 0;
+            const countLeaves = d => d.children ? d.children.reduce((s, c) => s + countLeaves(c), 0) : 1;
+            const totalLeaves = countLeaves(root);
+            const radius = Math.min(width, height) * 0.38;
+
+            // 径向布局：按叶子数分配角度
+            function radialLayout(node, startAngle, endAngle, depth) {
+                node.angle = (startAngle + endAngle) / 2;
+                node.radius = depth * (radius / Math.max(root.height, 2));
+                node.depth = depth;
+                if (node.children) {
+                    let childStart = startAngle;
+                    const totalChildLeaves = node.children.reduce((s, c) => s + countLeaves(c), 0);
+                    node.children.forEach(child => {
+                        const childLeaves = countLeaves(child);
+                        const childEnd = childStart + (endAngle - startAngle) * (childLeaves / totalChildLeaves);
+                        radialLayout(child, childStart, childEnd, depth + 1);
+                        childStart = childEnd;
+                    });
+                }
+            }
+            radialLayout(root, 0, Math.PI * 2, 0);
+
+            function getX(d) { return cx + d.radius * Math.cos(d.angle - Math.PI / 2); }
+            function getY(d) { return cy + d.radius * Math.sin(d.angle - Math.PI / 2); }
 
             let i = 0;
             function update(source) {
-                const treeData = treeLayout(root);
-                const nodes = treeData.descendants();
-                const links = treeData.links();
-                nodes.forEach(d => { d.y = d.depth * 220; });
+                // 重新计算布局
+                const allNodes = root.descendants();
+                const allLinks = root.links();
 
-                const node = g.selectAll('g.node').data(nodes, d => d.id || (d.id = ++i));
+                const node = g.selectAll('g.node').data(allNodes, d => d.id || (d.id = ++i));
 
                 const nodeEnter = node.enter().append('g')
                     .attr('class', 'node')
-                    .attr('transform', `translate(${source.y0},${source.x0})`)
+                    .attr('transform', `translate(${getX(source)},${getY(source)})`)
                     .style('cursor', 'pointer')
                     .on('click', (event, d) => {
                         if (d.children) { d._children = d.children; d.children = null; }
                         else { d.children = d._children; d._children = null; }
+                        // 重新布局
+                        radialLayout(root, 0, Math.PI * 2, 0);
                         update(d);
                     });
 
-                nodeEnter.append('rect').attr('rx', 10).attr('ry', 10)
-                    .attr('width', 1e-6).attr('height', 1e-6)
-                    .attr('x', 0).attr('y', -14)
-                    .style('fill', d => palette[d.depth % palette.length].bg)
-                    .style('stroke', d => d.depth === 0 ? '#4F46E5' : 'none')
-                    .style('stroke-width', d => d.depth === 0 ? '2px' : '0')
-                    .style('filter', 'url(#shadow)');
+                // 中心节点用圆形，其他用圆角矩形
+                nodeEnter.each(function(d) {
+                    const el = d3.select(this);
+                    if (d.depth === 0) {
+                        el.append('circle').attr('r', 1e-6)
+                            .style('fill', palette[0].bg)
+                            .style('stroke', '#fff').style('stroke-width', '3px')
+                            .style('filter', 'url(#glow)');
+                    } else {
+                        el.append('rect').attr('rx', 8).attr('ry', 8)
+                            .attr('width', 1e-6).attr('height', 1e-6)
+                            .attr('x', 0).attr('y', -13)
+                            .style('fill', palette[d.depth % palette.length].bg)
+                            .style('filter', 'url(#glow)');
+                    }
+                });
 
                 nodeEnter.append('text')
                     .attr('dy', '0.35em')
-                    .attr('x', 12)
-                    .attr('text-anchor', 'start')
+                    .attr('text-anchor', 'middle')
                     .text(d => {
-                        const maxLen = d.depth === 0 ? 20 : d.depth === 1 ? 16 : 12;
+                        const maxLen = d.depth === 0 ? 12 : d.depth === 1 ? 10 : 8;
                         const name = d.data.name.replace(/[📚✨📝🎯🌊🐠🎨💡📖🧱]/g, '').trim();
                         return name.length > maxLen ? name.slice(0, maxLen) + '…' : name;
                     })
-                    .style('font-size', d => d.depth === 0 ? '15px' : d.depth === 1 ? '13px' : '12px')
-                    .style('font-weight', d => d.depth <= 1 ? '600' : '400')
-                    .style('fill', d => palette[d.depth % palette.length].text)
+                    .style('font-size', d => d.depth === 0 ? '14px' : d.depth === 1 ? '12px' : '11px')
+                    .style('font-weight', d => d.depth <= 1 ? '700' : '500')
+                    .style('fill', '#fff')
                     .style('pointer-events', 'none');
 
-                nodeEnter.append('text')
-                    .attr('class', 'expand-icon')
-                    .attr('dy', '0.35em').attr('x', 12).attr('text-anchor', 'start')
-                    .style('font-size', '10px').style('fill', '#94A3B8')
-                    .text(d => d._children ? ' [+]' : '');
-
                 const nodeUpdate = nodeEnter.merge(node);
-                nodeUpdate.transition().duration(400).ease(d3.easeCubicOut)
-                    .attr('transform', d => `translate(${d.y},${d.x})`);
-                nodeUpdate.select('rect').transition().duration(400)
-                    .attr('width', d => {
-                        const text = d.data.name.replace(/[📚✨📝🎯🌊🐠🎨💡📖🧱]/g, '').trim();
-                        return Math.min(text.length * 14 + 24, 200);
-                    }).attr('height', 28)
-                    .style('fill', d => palette[d.depth % palette.length].bg);
+                nodeUpdate.transition().duration(500).ease(d3.easeCubicOut)
+                    .attr('transform', d => `translate(${getX(d)},${getY(d)})`);
 
-                const nodeExit = node.exit().transition().duration(400)
-                    .attr('transform', `translate(${source.y},${source.x})`).remove();
-                nodeExit.select('rect').attr('width', 0).attr('height', 0);
-                nodeExit.select('text').style('fill-opacity', 1e-6);
+                nodeUpdate.each(function(d) {
+                    const el = d3.select(this);
+                    if (d.depth === 0) {
+                        el.select('circle').transition().duration(500)
+                            .attr('r', 36)
+                            .style('fill', palette[0].bg);
+                    } else {
+                        const name = d.data.name.replace(/[📚✨📝🎯🌊🐠🎨💡📖🧱]/g, '').trim();
+                        el.select('rect').transition().duration(500)
+                            .attr('width', Math.max(name.length * 13 + 20, 60)).attr('height', 26)
+                            .attr('x', -Math.max(name.length * 13 + 20, 60) / 2).attr('y', -13)
+                            .style('fill', palette[d.depth % palette.length].bg);
+                    }
+                });
 
-                const link = g.selectAll('path.link').data(links, d => d.target.id);
+                node.exit().transition().duration(400)
+                    .attr('transform', `translate(${getX(source)},${getY(source)})`).remove()
+                    .select('rect, circle').attr('r', 0).attr('width', 0);
+
+                const link = g.selectAll('path.link').data(allLinks, d => d.target.id);
                 const linkEnter = link.enter().insert('path', 'g')
                     .attr('class', 'link')
-                    .attr('d', () => { const o = { x: source.x0, y: source.y0 }; return elbow(o, o); })
+                    .attr('d', () => `M ${getX(source)} ${getY(source)} Q ${getX(source)} ${getY(source)} ${getX(source)} ${getY(source)}`)
                     .style('fill', 'none')
-                    .style('stroke', d => palette[d.source.depth % palette.length].bg)
+                    .style('stroke', d => palette[d.source.depth % palette.length].line)
                     .style('stroke-width', '2px')
-                    .style('stroke-opacity', 0.5);
-                linkEnter.merge(link).transition().duration(400).attr('d', d => elbow(d.source, d.target));
-                link.exit().transition().duration(400).attr('d', () => { const o = { x: source.x, y: source.y }; return elbow(o, o); }).remove();
+                    .style('stroke-opacity', 0.6);
 
-                nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
-            }
+                linkEnter.merge(link).transition().duration(500).attr('d', d => {
+                    const sx = getX(d.source), sy = getY(d.source);
+                    const tx = getX(d.target), ty = getY(d.target);
+                    const mx = (sx + tx) / 2, my = (sy + ty) / 2;
+                    return `M ${sx} ${sy} Q ${mx} ${sy} ${tx} ${ty}`;
+                });
 
-            function elbow(s, d) {
-                return `M ${s.y} ${s.x} C ${(s.y + d.y) / 2} ${s.x}, ${(s.y + d.y) / 2} ${d.x}, ${d.y} ${d.x}`;
+                link.exit().transition().duration(400).remove();
             }
 
             update(root);
 
-            // 居中显示
+            // 居中适配
             setTimeout(() => {
                 const bbox = svg.node().getBBox();
-                const scale = Math.min(width / (bbox.width + 160), height / (bbox.height + 40), 1);
-                svg.attr('viewBox', `${bbox.x - 40} ${bbox.y - 20} ${bbox.width + 80} ${bbox.height + 40}`);
-            }, 500);
+                const pad = 60;
+                svg.attr('viewBox', `${bbox.x - pad} ${bbox.y - pad} ${bbox.width + pad * 2} ${bbox.height + pad * 2}`);
+            }, 600);
         }
 
         function copyNote() {
