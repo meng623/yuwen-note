@@ -290,8 +290,7 @@
         .tab-panel.active { display: block; }
         .mindmap-container {
             width: 100%;
-            height: 75vh;
-            min-height: 500px;
+            height: 600px;
             border: 1px solid var(--border);
             border-radius: 12px;
             overflow: hidden;
@@ -704,181 +703,81 @@
 
             const width = container.clientWidth || 800;
             const height = container.clientHeight || 500;
-            const cx = width / 2, cy = height / 2;
-
-            const palette = [
-                { bg: '#4F46E5', text: '#fff', line: '#818CF8' },
-                { bg: '#10B981', text: '#fff', line: '#6EE7B7' },
-                { bg: '#F59E0B', text: '#fff', line: '#FCD34D' },
-                { bg: '#EF4444', text: '#fff', line: '#FCA5A5' },
-                { bg: '#8B5CF6', text: '#fff', line: '#C4B5FD' },
-                { bg: '#EC4899', text: '#fff', line: '#F9A8D4' },
-                { bg: '#06B6D4', text: '#fff', line: '#67E8F9' },
-            ];
+            const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'];
 
             const svg = d3.select(container).append('svg')
-                .attr('width', width).attr('height', height);
-            svg.append('defs').append('filter').attr('id', 'glow')
-                .append('feGaussianBlur').attr('stdDeviation', 4).attr('result', 'blur');
-            svg.append('defs').select('#glow').append('feMerge')
-                .html('<feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/>');
+                .attr('width', width).attr('height', height)
+                .attr('viewBox', `0 0 ${width} ${height}`);
+            svg.append('defs').append('filter').attr('id', 'shadow')
+                .append('feDropShadow').attr('dx', 0).attr('dy', 2).attr('stdDeviation', 3).attr('flood-opacity', 0.1);
+            const g = svg.append('g').attr('transform', 'translate(100, 20)');
 
-            const g = svg.append('g');
-
+            const treeLayout = d3.tree().size([height - 40, width - 280]);
             const root = d3.hierarchy(data);
-            const countLeaves = d => d.children ? d.children.reduce((s, c) => s + countLeaves(c), 0) : 1;
-            const totalLeaves = countLeaves(root);
-            const maxDepth = 2; // 只显示2层，避免过于密集
-            const radius = Math.min(width, height) * 0.36;
+            root.x0 = height / 2;
+            root.y0 = 0;
 
-            // 径向布局：按叶子数分配角度
-            function radialLayout(node, startAngle, endAngle, depth) {
-                node.angle = (startAngle + endAngle) / 2;
-                node.radius = depth * (radius / maxDepth);
-                node.depth = depth;
-                if (node.children && depth < maxDepth) {
-                    let childStart = startAngle;
-                    const totalChildLeaves = node.children.reduce((s, c) => s + countLeaves(c), 0);
-                    node.children.forEach(child => {
-                        const childLeaves = countLeaves(child);
-                        const childEnd = childStart + (endAngle - startAngle) * (childLeaves / totalChildLeaves);
-                        radialLayout(child, childStart, childEnd, depth + 1);
-                        childStart = childEnd;
-                    });
-                }
-            }
-            radialLayout(root, 0, Math.PI * 2, 0);
-
-            function getX(d) { return cx + d.radius * Math.cos(d.angle - Math.PI / 2); }
-            function getY(d) { return cy + d.radius * Math.sin(d.angle - Math.PI / 2); }
-
-            let i = 0;
             function update(source) {
-                // 重新计算布局
-                const allNodes = root.descendants();
-                const allLinks = root.links();
+                const treeData = treeLayout(root);
+                const nodes = treeData.descendants();
+                const links = treeData.links();
 
-                const node = g.selectAll('g.node').data(allNodes, d => d.id || (d.id = ++i));
+                nodes.forEach(d => { d.y = d.depth * 200; });
+
+                const node = g.selectAll('g.node').data(nodes, d => d.id || (d.id = Math.random()));
 
                 const nodeEnter = node.enter().append('g')
                     .attr('class', 'node')
-                    .attr('transform', `translate(${getX(source)},${getY(source)})`)
-                    .style('cursor', 'pointer')
-                    .on('click', (event, d) => {
-                        if (d.children) { d._children = d.children; d.children = null; }
-                        else { d.children = d._children; d._children = null; }
-                        // 重新布局
-                        radialLayout(root, 0, Math.PI * 2, 0);
-                        update(d);
-                    });
+                    .attr('transform', `translate(${source.y0},${source.x0})`)
+                    .on('click', (event, d) => { if (d.children) { d._children = d.children; d.children = null; } else { d.children = d._children; d._children = null; } update(d); });
 
-                // 中心节点用圆形，其他用圆角矩形
-                nodeEnter.each(function(d) {
-                    const el = d3.select(this);
-                    if (d.depth === 0) {
-                        el.append('circle').attr('r', 1e-6)
-                            .style('fill', palette[0].bg)
-                            .style('stroke', '#fff').style('stroke-width', '3px')
-                            .style('filter', 'url(#glow)');
-                    } else {
-                        el.append('rect').attr('rx', 8).attr('ry', 8)
-                            .attr('width', 1e-6).attr('height', 1e-6)
-                            .attr('x', 0).attr('y', -13)
-                            .style('fill', palette[d.depth % palette.length].bg)
-                            .style('filter', 'url(#glow)');
-                    }
-                });
+                nodeEnter.append('circle').attr('r', 1e-6)
+                    .style('fill', d => d._children ? '#fff' : (colors[d.depth % colors.length]))
+                    .style('stroke', d => colors[d.depth % colors.length])
+                    .style('stroke-width', '2px')
+                    .style('cursor', 'pointer');
 
                 nodeEnter.append('text')
-                    .attr('class', 'node-text')
-                    .attr('dy', '0.35em')
-                    .attr('text-anchor', 'middle')
-                    .text(d => {
-                        const maxLen = d.depth === 0 ? 16 : d.depth === 1 ? 14 : 12;
-                        const name = d.data.name.replace(/[📚✨📝🎯🌊🐠🎨💡📖🧱]/g, '').trim();
-                        return name.length > maxLen ? name.slice(0, maxLen) + '…' : name;
-                    })
-                    .style('font-size', d => d.depth === 0 ? '18px' : d.depth === 1 ? '15px' : '13px')
-                    .style('font-weight', d => d.depth <= 1 ? '700' : '500')
-                    .style('fill', '#fff')
-                    .style('pointer-events', 'none');
-
-                // 有子节点时显示展开提示
-                nodeEnter.append('text')
-                    .attr('class', 'expand-hint')
-                    .attr('dy', '2em')
-                    .attr('text-anchor', 'middle')
-                    .style('font-size', '11px')
-                    .style('fill', 'rgba(255,255,255,0.8)')
-                    .style('pointer-events', 'none')
-                    .text(d => {
-                        if (d.depth >= maxDepth) return '';
-                        const count = (d.children || d._children || []).length;
-                        if (d._children) return `▼ 展开(${count})`;
-                        if (d.children && count > 0) return `▼ 收起`;
-                        return '';
-                    });
+                    .attr('dy', '.35em')
+                    .attr('x', d => d.children || d._children ? -14 : 14)
+                    .attr('text-anchor', d => d.children || d._children ? 'end' : 'start')
+                    .text(d => d.data.name.length > 16 ? d.data.name.slice(0, 16) + '…' : d.data.name)
+                    .style('font-size', d => d.depth === 0 ? '14px' : '12px')
+                    .style('font-weight', d => d.depth === 0 ? '700' : '400')
+                    .style('fill', '#1E293B');
 
                 const nodeUpdate = nodeEnter.merge(node);
-                nodeUpdate.transition().duration(500).ease(d3.easeCubicOut)
-                    .attr('transform', d => `translate(${getX(d)},${getY(d)})`);
+                nodeUpdate.transition().duration(300)
+                    .attr('transform', d => `translate(${d.y},${d.x})`);
+                nodeUpdate.select('circle')
+                    .attr('r', 6)
+                    .style('fill', d => d._children ? '#fff' : (colors[d.depth % colors.length]))
+                    .style('stroke', d => colors[d.depth % colors.length]);
 
-                nodeUpdate.each(function(d) {
-                    const el = d3.select(this);
-                    if (d.depth === 0) {
-                        el.select('circle').transition().duration(500)
-                            .attr('r', 50)
-                            .style('fill', palette[0].bg);
-                    } else {
-                        const name = d.data.name.replace(/[📚✨📝🎯🌊🐠🎨💡📖🧱]/g, '').trim();
-                        const w = Math.max(name.length * 16 + 30, 90);
-                        el.select('rect').transition().duration(500)
-                            .attr('width', w).attr('height', 36)
-                            .attr('x', -w / 2).attr('y', -18)
-                            .style('fill', palette[d.depth % palette.length].bg);
-                    }
-                    // 更新展开提示
-                    el.select('.expand-hint')
-                        .text(() => {
-                            if (d.depth >= maxDepth) return '';
-                            const count = (d.children || d._children || []).length;
-                            if (d._children) return `▸ 展开(${count})`;
-                            if (d.children && count > 0) return `▾ 收起`;
-                            return '';
-                        });
-                });
+                const nodeExit = node.exit().transition().duration(300)
+                    .attr('transform', `translate(${source.y},${source.x})`).remove();
+                nodeExit.select('circle').attr('r', 1e-6);
+                nodeExit.select('text').style('fill-opacity', 1e-6);
 
-                node.exit().transition().duration(400)
-                    .attr('transform', `translate(${getX(source)},${getY(source)})`).remove()
-                    .select('rect, circle').attr('r', 0).attr('width', 0);
-
-                const link = g.selectAll('path.link').data(allLinks, d => d.target.id);
+                const link = g.selectAll('path.link').data(links, d => d.target.id);
                 const linkEnter = link.enter().insert('path', 'g')
                     .attr('class', 'link')
-                    .attr('d', () => `M ${getX(source)} ${getY(source)} Q ${getX(source)} ${getY(source)} ${getX(source)} ${getY(source)}`)
-                    .style('fill', 'none')
-                    .style('stroke', d => palette[d.source.depth % palette.length].line)
-                    .style('stroke-width', '2px')
-                    .style('stroke-opacity', 0.6);
+                    .attr('d', () => { const o = { x: source.x0, y: source.y0 }; return diagonal(o, o); })
+                    .style('fill', 'none').style('stroke', '#CBD5E1').style('stroke-width', '1.5px');
+                linkEnter.merge(link).transition().duration(300).attr('d', d => diagonal(d.source, d.target));
+                link.exit().transition().duration(300).attr('d', () => { const o = { x: source.x, y: source.y }; return diagonal(o, o); }).remove();
 
-                linkEnter.merge(link).transition().duration(500).attr('d', d => {
-                    const sx = getX(d.source), sy = getY(d.source);
-                    const tx = getX(d.target), ty = getY(d.target);
-                    const mx = (sx + tx) / 2, my = (sy + ty) / 2;
-                    return `M ${sx} ${sy} Q ${mx} ${sy} ${tx} ${ty}`;
-                });
-
-                link.exit().transition().duration(400).remove();
+                nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
             }
+
+            function diagonal(s, d) { return `M ${s.y} ${s.x} C ${(s.y + d.y) / 2} ${s.x}, ${(s.y + d.y) / 2} ${d.x}, ${d.y} ${d.x}`; }
 
             update(root);
 
-            // 居中适配
             setTimeout(() => {
                 const bbox = svg.node().getBBox();
-                const pad = 60;
-                svg.attr('viewBox', `${bbox.x - pad} ${bbox.y - pad} ${bbox.width + pad * 2} ${bbox.height + pad * 2}`);
-            }, 600);
+                svg.attr('viewBox', `${bbox.x - 20} ${bbox.y - 20} ${bbox.width + 40} ${bbox.height + 40}`);
+            }, 400);
         }
 
         function copyNote() {
