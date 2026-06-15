@@ -1,70 +1,153 @@
 # -*- coding: utf-8 -*-
-import requests
-import sys
 import os
-import time
 import re
+import sys
+import time
+import logging
+from typing import Optional
+from urllib.parse import urljoin, urlparse
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
-# 从环境变量读取 API Key
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
+
 SENSENOVA_API_KEY = os.environ.get("API_KEY", "")
 
-def crawl_hanchacha(lesson_name):
-    """从 hanchacha.com 爬取所有相关资料"""
-    print(f"  🔍 正在从 hanchacha.com 搜索《{lesson_name}》...")
-    
-    all_text = ""
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    }
-    
-    try:
-        search_url = f"https://hanchacha.com/?s={lesson_name}"
-        response = requests.get(search_url, headers=headers, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        links = soup.find_all('a', href=True)
-        found_urls = []
-        
-        for link in links:
-            href = link.get('href', '')
-            text = link.get_text().lower()
-            if lesson_name.lower() in text and 'hanchacha.com' in href:
-                if href not in found_urls:
-                    found_urls.append(href)
-        
-        print(f"    找到 {len(found_urls)} 个相关页面")
-        
-        for url in found_urls[:3]:
-            try:
-                page_resp = requests.get(url, headers=headers, timeout=10)
-                page_soup = BeautifulSoup(page_resp.text, 'html.parser')
-                content_div = page_soup.find('article') or page_soup.find('div', class_='entry-content')
-                
-                if content_div:
-                    text = content_div.get_text(strip=True)
-                    text = re.sub(r'\s+', ' ', text)
-                    all_text += f"\n\n---\n{text[:1500]}"
-            except:
-                continue
-                
-    except Exception as e:
-        print(f"  hanchacha 爬取失败: {e}")
-    
-    return all_text[:4000]
+REQUEST_TIMEOUT = 15
+MAX_RETRY = 3
+CRAWL_DELAY = 1
+MAX_PAGES = 3
+MAX_TEXT_LEN = 4000
+MAX_RAW_LEN = 3000
 
-def generate_with_ai(lesson_name, raw_materials):
-    """使用 AI 生成详细的学霸笔记"""
-    
-    print(f"  🤖 AI 状态: {'已启用' if SENSENOVA_API_KEY else '未配置'}")
-    
-    if not SENSENOVA_API_KEY:
-        return generate_fallback_note(lesson_name, raw_materials)
-    
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    )
+}
+
+
+def _build_session() -> requests.Session:
+    session = requests.Session()
+    retries = Retry(
+        total=MAX_RETRY,
+        backoff_factor=0.5,
+        status_forcelist=[429, 500, 502, 503, 504],
+    )
+    adapter = HTTPAdapter(max_retries=retries)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    session.headers.update(HEADERS)
+    return session
+
+
+def _safe_get(session: requests.Session, url: str) -> Optional[str]:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return None
     try:
-        print("  🤖 正在调用 SenseNova API...")
-        
-        prompt = f"""你是小学语文特级教师。请为课文《{lesson_name}》生成一份超级详细的学霸笔记。
+        resp = session.get(url, timeout=REQUEST_TIMEOUT)
+        resp.raise_for_status()
+        resp.encoding = resp.apparent_encoding or "utf-8"
+        return resp.text
+    except requests.RequestException as e:
+        log.warning("请求失败 %s: %s", url, e)
+        return None
+
+
+def crawl_hanchacha(lesson_name: str) -> str:
+    """从 hanchacha.com 爬取所有相关资料"""
+    log.info("正在从 hanchacha.com 搜索《%s》...", lesson_name)
+
+    session = _build_session()
+    all_parts: list[str] = []
+
+    search_url = f"https://hanchacha.com/?s={lesson_name}"
+    html = _safe_get(session, search_url)
+    if not html:
+        return ""
+
+    soup = BeautifulSoup(html, "html.parser")
+    found_urls: list[str] = []
+
+    for link in soup.find_all("a", href=True):
+        href = link["href"]
+        text = link.get_text().lower()
+        if lesson_name.lower() in text and "hanchacha.com" in href:
+            if href not in found_urls:
+                found_urls.append(href)
+
+    log.info("找到 %d 个相关页面", len(found_urls))
+
+    for url in found_urls[:MAX_PAGES]:
+        time.sleep(CRAWL_DELAY)
+        page_html = _safe_get(session, url)
+        if not page_html:
+            continue
+
+        page_soup = BeautifulSoup(page_html, "html.parser")
+        content_div = (
+            page_soup.find("article")
+            or page_soup.find("div", class_="entry-content")
+        )
+        if content_div:
+            text = content_div.get_text(strip=True)
+            text = re.sub(r"\s+", " ", text)
+            all_parts.append(text[:1500])
+
+    result = "\n\n---\n".join(all_parts)
+    return result[:MAX_TEXT_LEN]
+
+
+def generate_with_ai(lesson_name: str, raw_materials: str) -> str:
+    """使用 AI 生成详细的学霸笔记"""
+    log.info("AI 状态: %s", "已启用" if SENSENOVA_API_KEY else "未配置")
+
+    if not SENSENOVA_API_KEY:
+        return _generate_fallback_note(lesson_name, raw_materials)
+
+    prompt = _build_prompt(lesson_name, raw_materials)
+
+    try:
+        log.info("正在调用 SenseNova API...")
+        resp = requests.post(
+            "https://token.sensenova.cn/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {SENSENOVA_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "sensenova-6.7-flash-lite",
+                "messages": [
+                    {"role": "system", "content": "你是小学语文特级教师，擅长写超详细、超专业的课文笔记。"},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.8,
+                "max_tokens": 4500,
+            },
+            timeout=90,
+        )
+        resp.raise_for_status()
+        note = resp.json()["choices"][0]["message"]["content"]
+        log.info("AI 生成成功，笔记长度: %d 字", len(note))
+        return note
+    except Exception as e:
+        log.warning("AI 调用异常: %s", e)
+        return _generate_fallback_note(lesson_name, raw_materials)
+
+
+def _build_prompt(lesson_name: str, raw_materials: str) -> str:
+    return f"""你是小学语文特级教师。请为课文《{lesson_name}》生成一份超级详细的学霸笔记。
 
 【要求】
 1. 必须像下面示例一样详细、专业
@@ -154,43 +237,13 @@ def generate_with_ai(lesson_name, raw_materials):
 ---
 
 【参考资料】
-{raw_materials[:3000]}
+{raw_materials[:MAX_RAW_LEN]}
 
 请直接输出笔记，不要输出解释。"""
 
-        response = requests.post(
-            "https://token.sensenova.cn/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {SENSENOVA_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "sensenova-6.7-flash-lite",
-                "messages": [
-                    {"role": "system", "content": "你是小学语文特级教师，擅长写超详细、超专业的课文笔记。"},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.8,
-                "max_tokens": 4500
-            },
-            timeout=90
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            note = result["choices"][0]["message"]["content"]
-            print(f"  ✅ AI 生成成功！笔记长度: {len(note)} 字")
-            return note
-        else:
-            print(f"  ⚠️ AI 调用失败: {response.status_code}")
-            return generate_fallback_note(lesson_name, raw_materials)
-            
-    except Exception as e:
-        print(f"  ⚠️ AI 异常: {e}")
-        return generate_fallback_note(lesson_name, raw_materials)
 
-def generate_fallback_note(lesson_name, raw_materials):
-    """备用笔记"""
+def _generate_fallback_note(lesson_name: str, raw_materials: str) -> str:
+    content = raw_materials[:500] if raw_materials else f"《{lesson_name}》是一篇优美的课文。"
     return f"""# 📖 {lesson_name} · 学习笔记
 
 > 正在努力生成中...
@@ -199,7 +252,7 @@ def generate_fallback_note(lesson_name, raw_materials):
 
 ## 📚 课文内容
 
-{raw_materials[:500] if raw_materials else f"《{lesson_name}》是一篇优美的课文。"}
+{content}
 
 ---
 
@@ -214,30 +267,28 @@ def generate_fallback_note(lesson_name, raw_materials):
 *生成时间：{time.strftime('%Y-%m-%d %H:%M:%S')}*
 """
 
-def main():
+
+def main() -> None:
     if len(sys.argv) < 2:
-        print("请提供课文名称")
+        print("用法: python crawler.py <课文名称>")
         sys.exit(1)
-    
+
     lesson_name = sys.argv[1]
-    print("=" * 50)
-    print(f"🕷️ 正在为《{lesson_name}》生成笔记...")
-    print(f"🤖 SenseNova API: {'已配置' if SENSENOVA_API_KEY else '未配置'}")
-    print("=" * 50)
-    
-    print("\n⭐ 爬取 hanchacha.com...")
-    hanchacha_text = crawl_hanchacha(lesson_name)
-    
-    print("\n🤖 调用 AI 生成笔记...")
-    note = generate_with_ai(lesson_name, hanchacha_text)
-    
-    os.makedirs('data', exist_ok=True)
+    log.info("=" * 50)
+    log.info("正在为《%s》生成笔记...", lesson_name)
+    log.info("SenseNova API: %s", "已配置" if SENSENOVA_API_KEY else "未配置")
+    log.info("=" * 50)
+
+    raw = crawl_hanchacha(lesson_name)
+    note = generate_with_ai(lesson_name, raw)
+
+    os.makedirs("data", exist_ok=True)
     output_file = f"data/{lesson_name}.md"
-    
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         f.write(note)
-    
-    print(f"\n✅ 笔记已保存: {output_file}")
+
+    log.info("笔记已保存: %s", output_file)
+
 
 if __name__ == "__main__":
     main()

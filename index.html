@@ -3,431 +3,584 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>语文笔记生成器 - 强制重新生成版</title>
+    <title>语文笔记生成器 · AI智能版</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --primary: #4F46E5;
+            --primary-light: #818CF8;
+            --primary-dark: #3730A3;
+            --accent: #F59E0B;
+            --accent-light: #FCD34D;
+            --bg: #F8FAFC;
+            --card: #FFFFFF;
+            --text: #1E293B;
+            --text-secondary: #64748B;
+            --border: #E2E8F0;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+            --radius: 16px;
+            --shadow: 0 4px 24px rgba(0,0,0,0.08);
+            --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
         }
-        
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg);
             min-height: 100vh;
-            padding: 40px 20px;
+            color: var(--text);
         }
-        
-        .container {
-            max-width: 1000px;
+
+        /* ===== Hero 区域 ===== */
+        .hero {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            padding: 60px 20px 80px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+            animation: float 15s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(30px, -30px); }
+        }
+        .hero h1 {
+            font-size: 2.8rem;
+            color: #fff;
+            margin-bottom: 12px;
+            position: relative;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        .hero p {
+            color: rgba(255,255,255,0.85);
+            font-size: 1.1rem;
+            position: relative;
+            max-width: 500px;
             margin: 0 auto;
         }
-        
-        header {
-            text-align: center;
-            color: white;
-            margin-bottom: 40px;
+
+        /* ===== 装饰插画 ===== */
+        .hero-art {
+            position: relative;
+            margin: 30px auto 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
         }
-        
-        header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-        }
-        
-        header p {
-            font-size: 1rem;
-            opacity: 0.9;
-        }
-        
-        .search-card {
-            background: white;
+        .hero-art .icon-item {
+            width: 80px;
+            height: 80px;
+            background: rgba(255,255,255,0.15);
             border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: transform 0.3s;
         }
-        
+        .hero-art .icon-item:hover {
+            transform: translateY(-5px) scale(1.05);
+        }
+
+        /* ===== 主内容区 ===== */
+        .container {
+            max-width: 900px;
+            margin: -40px auto 40px;
+            padding: 0 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 32px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+        }
+
+        /* ===== 搜索卡片 ===== */
         .input-group {
             display: flex;
-            gap: 15px;
+            gap: 12px;
             flex-wrap: wrap;
         }
-        
         .input-group input {
             flex: 1;
-            padding: 15px 20px;
+            min-width: 200px;
+            padding: 14px 20px;
             font-size: 1rem;
-            border: 2px solid #e0e0e0;
+            border: 2px solid var(--border);
             border-radius: 12px;
             outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            background: #F8FAFC;
         }
-        
         .input-group input:focus {
-            border-color: #667eea;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+            background: #fff;
         }
-        
-        .input-group button {
-            padding: 15px 30px;
+        .input-group input::placeholder {
+            color: #94A3B8;
+        }
+        .btn {
+            padding: 14px 28px;
             font-size: 1rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            font-weight: 600;
             border: none;
             border-radius: 12px;
             cursor: pointer;
-            font-weight: bold;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
-        
-        .input-group button:disabled {
-            opacity: 0.6;
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(79,70,229,0.3);
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
             cursor: not-allowed;
         }
-        
-        .loading {
-            background: white;
+        .btn-success {
+            background: var(--success);
+            color: #fff;
+        }
+        .btn-success:hover { background: #059669; }
+
+        /* ===== 提示条 ===== */
+        .tip-bar {
+            margin-top: 16px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.88rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tip-bar.warning {
+            background: #FEF3C7;
+            color: #92400E;
+            border: 1px solid #FDE68A;
+        }
+        .tip-bar.info {
+            background: #DBEAFE;
+            color: #1E40AF;
+            border: 1px solid #93C5FD;
+        }
+        .tip-bar.success {
+            background: #D1FAE5;
+            color: #065F46;
+            border: 1px solid #6EE7B7;
+        }
+
+        /* ===== 示例课文 ===== */
+        .examples {
+            margin-top: 20px;
+        }
+        .examples-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        .example-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .chip {
+            padding: 8px 16px;
+            background: #F1F5F9;
+            border: 1px solid var(--border);
             border-radius: 20px;
-            padding: 40px;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text);
+        }
+        .chip:hover {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        /* ===== Loading ===== */
+        .loading-card {
             text-align: center;
+            padding: 50px 30px;
             display: none;
         }
-        
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
+        .loading-card .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary);
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            animation: spin 0.8s linear infinite;
             margin: 0 auto 20px;
         }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-card p {
+            color: var(--text-secondary);
+            font-size: 1rem;
         }
-        
+        .loading-card .progress {
+            margin-top: 12px;
+            font-size: 0.88rem;
+            color: #94A3B8;
+        }
+
+        /* ===== 结果卡片 ===== */
         .result-card {
-            background: white;
-            border-radius: 20px;
-            overflow: hidden;
             display: none;
         }
-        
         .result-header {
-            background: #f8f9fa;
-            padding: 20px 30px;
-            border-bottom: 2px solid #e0e0e0;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 12px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
         }
-        
         .result-header h2 {
-            color: #333;
+            font-size: 1.3rem;
+            color: var(--text);
         }
-        
-        .copy-btn {
-            padding: 8px 16px;
-            background: #28a745;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
+        .result-actions {
+            display: flex;
+            gap: 8px;
         }
-        
         .note-content {
-            padding: 30px;
-            line-height: 1.8;
-            max-height: 600px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            font-family: inherit;
+            line-height: 1.9;
+            font-size: 0.95rem;
+            color: var(--text);
         }
-        
+        .note-content h1 { font-size: 1.6rem; margin: 28px 0 12px; color: var(--primary-dark); font-weight: 700; }
+        .note-content h2 { font-size: 1.3rem; margin: 22px 0 10px; color: var(--text); font-weight: 700; border-left: 4px solid var(--primary); padding-left: 12px; }
+        .note-content h3 { font-size: 1.1rem; margin: 16px 0 8px; color: var(--primary); font-weight: 600; }
+        .note-content p { margin: 8px 0; }
+        .note-content hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+        .note-content strong { color: var(--primary-dark); }
+        .note-content blockquote {
+            border-left: 4px solid var(--accent);
+            background: #FEF3C7;
+            padding: 12px 16px;
+            margin: 12px 0;
+            border-radius: 0 8px 8px 0;
+            color: #92400E;
+        }
+        .note-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 0.9rem;
+        }
+        .note-content th {
+            background: var(--primary);
+            color: #fff;
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .note-content th:first-child { border-radius: 8px 0 0 0; }
+        .note-content th:last-child { border-radius: 0 8px 0 0; }
+        .note-content td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .note-content tr:nth-child(even) td { background: #F8FAFC; }
+        .note-content tr:hover td { background: #EEF2FF; }
+
+        /* ===== 错误卡片 ===== */
         .error-card {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 20px;
-            border-radius: 12px;
             display: none;
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: #991B1B;
+            padding: 20px 24px;
+            border-radius: var(--radius);
         }
-        
-        .token-status {
-            margin-top: 15px;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 0.85rem;
+
+        /* ===== 底部信息 ===== */
+        .footer {
             text-align: center;
-        }
-        
-        .token-ok {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .token-missing {
-            background: #fff3cd;
-            color: #856404;
-        }
-        
-        .progress-info {
-            margin-top: 10px;
+            padding: 40px 20px;
+            color: var(--text-secondary);
             font-size: 0.85rem;
-            color: #666;
         }
-        
-        .warning {
-            background: #fff3cd;
-            color: #856404;
-            padding: 10px;
-            border-radius: 8px;
-            margin-top: 15px;
-            font-size: 0.85rem;
-            text-align: center;
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
         }
-        
+        .footer a:hover { text-decoration: underline; }
+
+        /* ===== 响应式 ===== */
         @media (max-width: 600px) {
-            .input-group {
-                flex-direction: column;
-            }
-            header h1 {
-                font-size: 1.8rem;
-            }
+            .hero h1 { font-size: 1.8rem; }
+            .hero-art .icon-item { width: 60px; height: 60px; font-size: 1.6rem; }
+            .input-group { flex-direction: column; }
+            .card { padding: 20px; }
         }
     </style>
 </head>
 <body>
+
+    <!-- Hero -->
+    <div class="hero">
+        <h1>语文笔记生成器</h1>
+        <p>输入课文名称，AI 自动爬取资料并生成详细学霸笔记</p>
+        <div class="hero-art">
+            <div class="icon-item">📖</div>
+            <div class="icon-item">🤖</div>
+            <div class="icon-item">📝</div>
+            <div class="icon-item">🎨</div>
+        </div>
+    </div>
+
     <div class="container">
-        <header>
-            <h1>🕷️ 语文笔记生成器 · AI智能版</h1>
-            <p>每次点击都重新爬取 + AI 重新生成 | 无缓存 | 强制刷新</p>
-        </header>
-        
-        <div class="search-card">
+        <!-- 搜索卡片 -->
+        <div class="card">
             <div class="input-group">
                 <input type="text" id="lessonName" placeholder="输入课文名称，例如：海底世界" />
-                <button id="generateBtn" onclick="generateNote()">🚀 重新生成笔记</button>
+                <button class="btn btn-primary" id="generateBtn" onclick="generateNote()">
+                    <span>✨</span> 生成笔记
+                </button>
             </div>
-            
-            <div class="warning">
-                ⚡ 每次点击都会重新爬取 hanchacha.com 并调用 AI 重新生成，不会使用旧笔记
+
+            <div class="tip-bar warning">
+                <span>⚡</span> 每次点击都会重新爬取并调用 AI 生成，不会使用缓存
             </div>
-            
-            <div id="tokenStatus" class="token-status token-missing">
-                ⚠️ 正在检测 Token...
+
+            <div id="tokenStatus" class="tip-bar info">
+                <span>⏳</span> 正在检测 Token...
+            </div>
+
+            <div class="examples">
+                <div class="examples-label">试试这些课文：</div>
+                <div class="example-chips">
+                    <div class="chip" onclick="quickFill('海底世界')">海底世界</div>
+                    <div class="chip" onclick="quickFill('富饶的西沙群岛')">富饶的西沙群岛</div>
+                    <div class="chip" onclick="quickFill('美丽的小兴安岭')">美丽的小兴安岭</div>
+                    <div class="chip" onclick="quickFill('大自然的声音')">大自然的声音</div>
+                    <div class="chip" onclick="quickFill('花钟')">花钟</div>
+                    <div class="chip" onclick="quickFill('赵州桥')">赵州桥</div>
+                </div>
             </div>
         </div>
-        
-        <div id="loading" class="loading">
+
+        <!-- Loading -->
+        <div id="loading" class="card loading-card">
             <div class="spinner"></div>
-            <p id="loadingText">🕷️ 正在触发爬虫...</p>
-            <div class="progress-info" id="progressInfo"></div>
+            <p id="loadingText">正在触发爬虫...</p>
+            <div class="progress" id="progressInfo"></div>
         </div>
-        
-        <div id="resultCard" class="result-card">
+
+        <!-- 结果 -->
+        <div id="resultCard" class="card result-card">
             <div class="result-header">
-                <h2>📖 AI 生成结果</h2>
-                <button class="copy-btn" onclick="copyNote()">📋 复制笔记</button>
+                <h2>📖 生成结果</h2>
+                <div class="result-actions">
+                    <button class="btn btn-success" onclick="copyNote()">📋 复制</button>
+                </div>
             </div>
             <div id="noteContent" class="note-content"></div>
         </div>
-        
+
+        <!-- 错误 -->
         <div id="errorCard" class="error-card"></div>
+    </div>
+
+    <div class="footer">
+        <p>语文笔记生成器 · Powered by AI · <a href="https://github.com/meng623/yuwen-note" target="_blank">GitHub</a></p>
     </div>
 
     <script>
         const REPO_OWNER = "meng623";
         const REPO_NAME = "yuwen-note";
-        
-        // 检查 Token 状态
+
+        function quickFill(name) {
+            document.getElementById('lessonName').value = name;
+            generateNote();
+        }
+
         function checkTokenStatus() {
             const token = localStorage.getItem('github_token');
-            const statusDiv = document.getElementById('tokenStatus');
+            const el = document.getElementById('tokenStatus');
             if (token && token.startsWith('ghp_')) {
-                statusDiv.innerHTML = '✅ GitHub Token 已配置，爬虫功能可用！每次都会重新生成。';
-                statusDiv.className = 'token-status token-ok';
+                el.innerHTML = '<span>✅</span> Token 已配置，功能可用';
+                el.className = 'tip-bar success';
                 return true;
             } else {
-                statusDiv.innerHTML = '⚠️ 未配置 GitHub Token<br>📌 按 F12 打开 Console，输入：localStorage.setItem("github_token", "你的token")';
-                statusDiv.className = 'token-status token-missing';
+                el.innerHTML = '<span>⚠️</span> 未配置 Token — 按 F12 输入：<code style="background:#fff;padding:2px 6px;border-radius:4px;">localStorage.setItem("github_token", "你的token")</code>';
+                el.className = 'tip-bar warning';
                 return false;
             }
         }
-        
-        // 生成唯一的时间戳，用于强制刷新
-        function getTimestamp() {
-            return new Date().getTime();
-        }
-        
+
         async function generateNote() {
             const lessonName = document.getElementById('lessonName').value.trim();
-            const generateBtn = document.getElementById('generateBtn');
-            
-            if (!lessonName) {
-                alert('请输入课文名称');
-                return;
-            }
-            
-            // 禁用按钮，防止重复点击
-            generateBtn.disabled = true;
-            generateBtn.textContent = '⏳ 生成中...';
-            
-            // 清空所有显示
+            const btn = document.getElementById('generateBtn');
+
+            if (!lessonName) { alert('请输入课文名称'); return; }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳</span> 生成中...';
+
             document.getElementById('loading').style.display = 'block';
             document.getElementById('resultCard').style.display = 'none';
             document.getElementById('errorCard').style.display = 'none';
-            document.getElementById('loadingText').innerHTML = '🕷️ 正在触发爬虫...';
-            document.getElementById('progressInfo').innerHTML = '';
-            
+            document.getElementById('loadingText').textContent = '正在触发爬虫...';
+            document.getElementById('progressInfo').textContent = '';
+
             const token = localStorage.getItem('github_token');
-            
+
             try {
-                // 检查 Token
                 if (!token || !token.startsWith('ghp_')) {
                     throw new Error('未配置 GitHub Token，无法触发爬虫');
                 }
-                
-                // 触发爬虫 - 每次都是新的请求
-                document.getElementById('loadingText').innerHTML = '📡 正在触发 GitHub Actions 爬虫...';
+
+                document.getElementById('loadingText').textContent = '正在连接 GitHub Actions...';
                 const triggered = await triggerWorkflow(lessonName, token);
-                
-                if (!triggered) {
-                    throw new Error('触发爬虫失败，请检查 Token 权限');
-                }
-                
-                // 等待结果 - 轮询检查新生成的文件
-                document.getElementById('loadingText').innerHTML = '🕷️ 爬虫已启动，正在从 hanchacha.com 抓取资料...';
-                document.getElementById('progressInfo').innerHTML = '⏱️ 预计需要 30-90 秒，请耐心等待（AI 正在生成超详细笔记）';
-                
+                if (!triggered) throw new Error('触发失败，请检查 Token 权限');
+
+                document.getElementById('loadingText').textContent = '爬虫已启动，正在抓取资料...';
+                document.getElementById('progressInfo').textContent = '预计需要 30-90 秒，请耐心等待';
+
                 const note = await pollForNewResult(lessonName);
-                
+
                 if (note) {
-                    document.getElementById('loadingText').innerHTML = '✅ 生成完成！';
+                    document.getElementById('loadingText').textContent = '生成完成！';
                     displayNote(note);
                     document.getElementById('loading').style.display = 'none';
                 } else {
-                    throw new Error('爬取超时，未获取到内容。请检查 Actions 运行状态。');
+                    throw new Error('爬取超时，请检查 Actions 运行状态');
                 }
-                
             } catch (error) {
-                console.error('Error:', error);
-                document.getElementById('errorCard').innerHTML = `❌ ${error.message}<br><br>💡 提示：可以在 GitHub Actions 页面手动运行测试，查看详细日志。`;
+                document.getElementById('errorCard').innerHTML = `<strong>❌ ${error.message}</strong><br><br>💡 可在 GitHub Actions 页面查看详细日志。`;
                 document.getElementById('errorCard').style.display = 'block';
                 document.getElementById('loading').style.display = 'none';
             } finally {
-                // 恢复按钮
-                generateBtn.disabled = false;
-                generateBtn.textContent = '🚀 重新生成笔记';
+                btn.disabled = false;
+                btn.innerHTML = '<span>✨</span> 生成笔记';
             }
         }
-        
+
         async function triggerWorkflow(lessonName, token) {
             const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/crawl.yml/dispatches`;
             try {
-                const response = await fetch(url, {
+                const resp = await fetch(url, {
                     method: 'POST',
                     headers: {
                         'Authorization': `token ${token}`,
                         'Accept': 'application/vnd.github.v3+json',
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        ref: 'main',
-                        inputs: { 
-                            lesson_name: lessonName
-                        }
-                    })
+                    body: JSON.stringify({ ref: 'main', inputs: { lesson_name: lessonName } })
                 });
-                
-                if (response.ok) {
-                    console.log('✅ 爬虫触发成功');
-                    return true;
-                } else {
-                    const text = await response.text();
-                    console.log('❌ 触发失败:', response.status, text);
-                    return false;
-                }
-            } catch (e) {
-                console.error('触发失败:', e);
-                return false;
-            }
+                return resp.ok;
+            } catch { return false; }
         }
-        
+
         async function pollForNewResult(lessonName, maxAttempts = 120, interval = 5000) {
             const token = localStorage.getItem('github_token');
             for (let i = 0; i < maxAttempts; i++) {
                 await new Promise(r => setTimeout(r, interval));
-                document.getElementById('progressInfo').innerHTML = `鈴憋笍 绛夊緟涓?.. (${i+1}/${maxAttempts}) AI 姝ｅ湪鐢熸垚璇︾粏绗旇`;
-                
+                document.getElementById('progressInfo').textContent = `等待中... (${i + 1}/${maxAttempts})`;
                 try {
                     const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/data/${encodeURIComponent(lessonName)}.md`;
-                    const response = await fetch(url, {
-                        headers: {
-                            'Authorization': `token ${token}`,
-                            'Accept': 'application/vnd.github.v3+json'
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
+                    const resp = await fetch(url, { headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' } });
+                    if (resp.ok) {
+                        const data = await resp.json();
                         const note = atob(data.content.replace(/\n/g, ''));
-                        if (note && note.length > 800 && !note.includes('AI 鏈嶅姟鏆傛椂涓嶅彲鐢?) && !note.includes('姝ｅ湪鍔姏鐢熸垚涓?)) {
-                            console.log(`鉁?鑾峰彇鍒版柊绗旇锛岄暱搴? ${note.length} 瀛梎);
-                            return note;
-                        }
+                        if (note && note.length > 800 && !note.includes('正在努力生成中')) return note;
                     }
-                } catch(e) {
-                }
+                } catch {}
             }
             return null;
-        }function displayNote(note) {
-            // 简单 Markdown 转 HTML
+        }
+
+        function displayNote(note) {
             let html = note
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/\n/g, '<br>')
-                .replace(/^# (.*$)/gm, '<h1 style="font-size: 1.8rem; margin: 20px 0 10px; color: #333;">$1</h1>')
-                .replace(/^## (.*$)/gm, '<h2 style="font-size: 1.4rem; margin: 15px 0 10px; color: #555;">$1</h2>')
-                .replace(/^### (.*$)/gm, '<h3 style="font-size: 1.2rem; margin: 12px 0 8px; color: #667eea;">$1</h3>')
-                .replace(/^#### (.*$)/gm, '<h4 style="font-size: 1.1rem; margin: 10px 0 5px; color: #764ba2;">$1</h4>')
-                .replace(/^---$/gm, '<hr style="margin: 20px 0;">')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/^> (.*$)/gm, '<blockquote style="border-left: 4px solid #667eea; padding-left: 15px; margin: 10px 0; color: #666;">$1</blockquote>')
-                .replace(/\|/g, '|');
-            
-            // 简单处理表格
-            html = html.replace(/\|(.+)\|/g, function(match) {
-                let cells = match.split('|').filter(c => c.trim());
-                if (cells.length > 1) {
-                    return '<div style="display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #eee;">' + 
-                           cells.map(cell => '<span style="flex: 1;">' + cell.trim() + '</span>').join('') + 
-                           '</div>';
-                }
-                return match;
+                .replace(/>/g, '&gt;');
+
+            // 标题
+            html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+            html = html.replace(/^---$/gm, '<hr>');
+
+            // 粗体 & 斜体
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+            // 引用
+            html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+            // 表格
+            html = html.replace(/(?:^|\n)(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)+)/g, function(match, header, sep, body) {
+                const headers = header.split('|').filter(c => c.trim()).map(c => `<th>${c.trim()}</th>`).join('');
+                const rows = body.trim().split('\n').map(row => {
+                    const cells = row.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+                    return `<tr>${cells}</tr>`;
+                }).join('');
+                return `<table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table>`;
             });
-            
+
+            // 列表
+            html = html.replace(/^\* (.+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+
+            // 换行
+            html = html.replace(/\n/g, '<br>');
+            html = html.replace(/<br><(h[1-4]|hr|table|ul|blockquote)/g, '<$1');
+            html = html.replace(/<\/(h[1-4]|hr|table|ul|blockquote)><br>/g, '</$1>');
+
             document.getElementById('noteContent').innerHTML = html;
             document.getElementById('resultCard').style.display = 'block';
         }
-        
+
         function copyNote() {
             const text = document.getElementById('noteContent').innerText;
-            navigator.clipboard.writeText(text);
-            alert('✅ 笔记已复制到剪贴板');
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector('.btn-success');
+                btn.innerHTML = '<span>✅</span> 已复制';
+                setTimeout(() => { btn.innerHTML = '<span>📋</span> 复制'; }, 2000);
+            });
         }
-        
-        // 回车生成
+
         document.getElementById('lessonName').addEventListener('keypress', e => {
             if (e.key === 'Enter') generateNote();
         });
-        
-        // 页面加载检查
+
         checkTokenStatus();
-        console.log('📚 语文笔记生成器已加载（强制重新生成模式）');
-        console.log('💡 每次点击都会重新爬取 + AI 重新生成，不使用任何缓存');
     </script>
 </body>
 </html>
